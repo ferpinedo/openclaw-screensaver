@@ -393,6 +393,10 @@
       pointer-events: auto;
     }
 
+    .debug-panel.hidden {
+      display: none !important;
+    }
+
     .debug-header {
       display: flex;
       align-items: center;
@@ -624,7 +628,7 @@
           <button class="button ghost" type="button" id="closeButton">Close</button>
         </div>
 
-        <div class="setup-hint">Shortcut: <code>Ctrl+,</code> opens these settings at any time. For local development without the gateway, run <code>./start.sh</code>.</div>
+        <div class="setup-hint">Shortcuts: <code>Ctrl+,</code> opens these settings; <code>Ctrl+.</code> toggles the diagnostics panel. For local development without the gateway, run <code>./start.sh</code>.</div>
         <div class="setup-error" id="setupError" aria-live="polite"></div>
       </form>
     </div>
@@ -675,6 +679,7 @@
     const setupOverlay = document.getElementById('setupOverlay');
     const settingsForm = document.getElementById('settingsForm');
     const setupError = document.getElementById('setupError');
+    const debugPanel = document.getElementById('debugPanel');
     const debugSummary = document.getElementById('debugSummary');
     const debugLog = document.getElementById('debugLog');
     const copyDebugButton = document.getElementById('copyDebugButton');
@@ -709,6 +714,7 @@
       connectionState: 'setup',
       connectionHint: 'Configure OpenClaw with Ctrl+,',
       settingsOpen: false,
+      diagnosticsPanelVisible: true,
       legacyPolling: false,
       connectNonce: '',
       connectSent: false,
@@ -735,6 +741,12 @@
       } catch (error) {
         return String(value);
       }
+    }
+
+    function syncDiagnosticsPanelVisibility() {
+      if (!debugPanel) return;
+      debugPanel.classList.toggle('hidden', !state.diagnosticsPanelVisible);
+      debugPanel.setAttribute('aria-hidden', state.diagnosticsPanelVisible ? 'false' : 'true');
     }
 
     function updateDebugPanel() {
@@ -1800,6 +1812,13 @@
     });
 
     window.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && !event.metaKey && !event.altKey && event.code === 'Period') {
+        event.preventDefault();
+        state.diagnosticsPanelVisible = !state.diagnosticsPanelVisible;
+        syncDiagnosticsPanelVisibility();
+        return;
+      }
+
       if (event.ctrlKey && event.key === ',') {
         event.preventDefault();
         openSettings(false);
@@ -1908,6 +1927,7 @@
       }
 
       updateDebugPanel();
+      syncDiagnosticsPanelVisibility();
       window.requestAnimationFrame(loop);
     }
 
