@@ -4,85 +4,84 @@ Public activity display for OpenClaw.
 
 This project is moving from a local Python + browser demo into a packaged desktop app built with Tauri so users can install it, pair it with OpenClaw, and leave it running full-screen in a public space.
 
+## Recommended setup: local OpenClaw (same machine)
+
+**The recommended approach is to run OpenClaw and this screen app on the same computer.** You use the loopback WebSocket URL, a single gateway token, and avoid exposing the gateway over the network for a simple lobby or office display.
+
+1. **Start OpenClaw** on that machine so the gateway WebSocket is listening (default URL: `ws://127.0.0.1:18789/`). Use whatever command or service your OpenClaw install documents for running the gateway locally.
+
+2. **Read the gateway token** in a terminal (on the same machine):
+
+   ```bash
+   openclaw config get gateway.auth.token
+   ```
+
+   Copy **only** the token string that command prints. Paste it into the activity screen’s **Gateway token** field in settings. Do not paste shell commands (such as `rm …` or `openclaw config …`) into that field — the app sends that value to the gateway as the shared auth token.
+
+3. **Run the activity screen** (development or installed package):
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+   Or install a built `.deb` / AppImage / platform bundle and launch **OpenClaw Activity Screen**.
+
+4. Open settings with **Ctrl+,**. Optionally set **Screen title** (large heading), **Display name** (pairing / presence), then click **Use local OpenClaw** (pre-fills `ws://127.0.0.1:18789`) or enter that URL manually. Paste the gateway token and choose **Save and connect**.
+
+5. **Approve pairing once** (first connection only):
+
+   ```bash
+   openclaw devices list
+   openclaw devices approve <requestId>
+   ```
+
+After the first success, the screen stores a paired device token and reconnects automatically.
+
+Shortcuts: **Ctrl+,** opens settings; **Ctrl+.** toggles the diagnostics panel.
+
 ## Product direction
 
 The intended end-user flow is:
 
-1. Download an installer from GitHub Releases.
-2. Open the app.
-3. Paste an OpenClaw setup code or gateway URL.
-4. Leave the app running full-screen while OpenClaw pushes events in real time.
+1. Install the app (or run from source).
+2. Connect to OpenClaw (locally recommended; remote optional).
+3. Leave the app running full-screen while OpenClaw pushes events in real time.
 
 The public-machine lock down should happen at the OS level, not inside the app.
 
-- Linux: use a dedicated kiosk session or locked-down desktop account
-- Windows: use Assigned Access / kiosk mode
-- macOS: use device restrictions outside the app
+- Linux: dedicated kiosk or locked-down desktop account (see [Ubuntu kiosk (OS-level)](#ubuntu-kiosk-os-level) below)
+- Windows: Assigned Access / kiosk mode
+- macOS: device restrictions outside the app
 
 ## Current app modes
 
 This repo currently supports two modes:
 
-1. `Tauri desktop app`
-2. `Local Python bridge` for development and compatibility with the original webhook demo
+1. **Tauri desktop app** — real gateway WebSocket, pairing, live events.
+2. **Local Python bridge** — `server.py` + browser for demos and webhook-triggered animations.
 
 ### Tauri desktop app
 
-The desktop app loads the UI directly from `web/index.html`, stores settings locally, and connects to the real OpenClaw gateway WebSocket.
+The desktop app loads the UI from `web/index.html`, stores settings locally, and connects to the real OpenClaw gateway WebSocket.
 
-Current first-run fields:
+Settings include:
 
-- `Setup code`
-- `Gateway URL`
-- `Display name`
-- `Gateway token`
+- **Setup code** (optional; encodes URL + bootstrap token)
+- **Gateway URL** (`ws://` / `wss://`)
+- **Display name** (pairing and gateway presence)
+- **Screen title** (large heading at the top of the display)
+- **Gateway token** (shared gateway auth token when not using only a setup code)
 
-Open settings at any time with `Ctrl+,`.
+### Remote or LAN setup (optional)
 
-Recommended setup path:
-
-1. Generate a setup code from the OpenClaw machine:
+If the gateway is not on localhost, use a setup code or enter `wss://…` / `ws://…` and the token or bootstrap flow your deployment uses. Prefer **`wss://`** on untrusted networks.
 
 ```bash
 openclaw qr --setup-code-only
-```
-
-2. Paste that code into the app.
-3. Approve the pending pairing request:
-
-```bash
 openclaw devices list
 openclaw devices approve <requestId>
 ```
-
-After the first successful connect, the screen stores its paired device token and reconnects with that bounded token automatically.
-
-### Same-machine setup
-
-If OpenClaw and the screen app run on the same computer, you usually do not need a setup code.
-
-Use the in-app `Use local OpenClaw` button, which pre-fills:
-
-```text
-ws://127.0.0.1:18789
-```
-
-Then paste your gateway token and connect.
-
-You can read the token with:
-
-```bash
-openclaw config get gateway.auth.token
-```
-
-The first local connection still creates a pairing request that you approve once:
-
-```bash
-openclaw devices list
-openclaw devices approve <requestId>
-```
-
-After that first approval, the app reconnects locally using its stored device token.
 
 ### Local Python bridge
 
@@ -92,6 +91,14 @@ It serves the UI from `web/` and exposes:
 
 - `GET /state`
 - `POST /event`
+
+Run:
+
+```bash
+./start.sh
+```
+
+Then open `http://localhost:8765`.
 
 ## Repository structure
 
@@ -110,19 +117,12 @@ You need:
 
 Install the official Tauri prerequisites before building, especially on Linux where system packages are required.
 
-Install dependencies:
-
 ```bash
 npm install
-```
-
-Run the desktop app in development:
-
-```bash
 npm run dev
 ```
 
-Build installers for the current platform:
+Build installers for the current platform (ensure `cargo` is on your `PATH`, e.g. `source "$HOME/.cargo/env"`):
 
 ```bash
 npm run build
@@ -130,7 +130,7 @@ npm run build
 
 ## OpenClaw gateway integration
 
-This app now talks to OpenClaw using the built-in gateway protocol instead of a custom display-only endpoint.
+This app talks to OpenClaw using the built-in gateway protocol.
 
 What it uses:
 
@@ -138,38 +138,13 @@ What it uses:
 - device identity signing
 - device pairing and paired device tokens
 - gateway events such as `cron`, `heartbeat`, `chat`, and `sessions.changed`
-- `sessions.subscribe` and `sessions.preview` to surface recent message activity
+- `sessions.subscribe` and `sessions.preview` for recent message activity
 
-The intended OpenClaw-side setup is already available in OpenClaw itself. No custom backend endpoint is required for this app.
-
-For remote/public installs, prefer secure gateway URLs:
-
-- `wss://...` for internet or public-network access
-- `ws://...` only for localhost or trusted private LAN use
-
-The easiest operator flow is:
-
-```bash
-openclaw qr --setup-code-only
-openclaw devices list
-openclaw devices approve <requestId>
-```
+No custom backend endpoint is required beyond OpenClaw’s gateway.
 
 ## Local bridge development
 
-Run the original Python server:
-
-```bash
-./start.sh
-```
-
-Then open:
-
-```bash
-http://localhost:8765
-```
-
-Trigger a message event:
+Example webhook triggers (with `./start.sh` running):
 
 ```bash
 curl -X POST http://localhost:8765/event \
@@ -182,8 +157,6 @@ curl -X POST http://localhost:8765/event \
   }'
 ```
 
-Trigger a cron event:
-
 ```bash
 curl -X POST http://localhost:8765/event \
   -H 'Content-Type: application/json' \
@@ -195,30 +168,76 @@ curl -X POST http://localhost:8765/event \
   }'
 ```
 
-## Linux kiosk deployment
+## Ubuntu kiosk (OS-level)
 
-For a public installation on Linux, the recommended split is:
+For a public Ubuntu display, treat the **session** as the security boundary: dedicated user, auto-login, autostart the app, and reduce escape hatches (lock screen, suspend, stray shortcuts). The Tauri window is already fullscreen without decorations; the OS should keep users in that session.
 
-1. Tauri app for the display experience
-2. Linux kiosk session for machine lockdown
+### 1. Dedicated user
 
-Recommended deployment rules:
+Create a non-administrative user used only for the display (example name: `display`):
 
-- dedicated user account for the display
-- auto-login into that account
-- auto-start the app on login
-- restrict shell access and desktop shortcuts
-- disable unnecessary services and notifications
-- require admin credentials to leave kiosk mode
+```bash
+sudo adduser display
+```
 
-The app should not be treated as the security boundary. The OS session is the security boundary.
+Install your OpenClaw Activity Screen package or place the AppImage/binary where that user can execute it (e.g. `/opt/openclaw-activity-screen/` with appropriate permissions).
+
+### 2. Autostart the app (GNOME)
+
+Log in once as `display`, then create an autostart entry (adjust `Exec` to your real path or AppImage):
+
+```bash
+mkdir -p ~/.config/autostart
+nano ~/.config/autostart/openclaw-activity-screen.desktop
+```
+
+Example `openclaw-activity-screen.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=OpenClaw Activity Screen
+Exec=/opt/openclaw-activity-screen/openclaw-activity-screen
+X-GNOME-Autostart-enabled=true
+```
+
+Ensure OpenClaw itself is started for this machine if the screen should connect locally (systemd user service, login script, or another autostart entry — follow OpenClaw’s docs for your install).
+
+### 3. Automatic login (GDM)
+
+So the display boots straight into the `display` user:
+
+- **GUI:** Settings → Users → unlock → enable **Automatic Login** for `display`.
+
+- **Or** edit `/etc/gdm3/custom.conf` (Ubuntu with GDM) under `[daemon]`:
+
+  ```ini
+  AutomaticLoginEnable=true
+  AutomaticLogin=display
+  ```
+
+Reboot and confirm the session opens without a password prompt.
+
+### 4. Reduce screen lock and idle sleep (GNOME, as `display`)
+
+```bash
+gsettings set org.gnome.desktop.screensaver lock-enabled false
+gsettings set org.gnome.desktop.session idle-delay 0
+```
+
+Optionally disable automatic suspend in **Settings → Power** for that user.
+
+### 5. Hardening (short list)
+
+- Do not grant `sudo` or unnecessary groups to the `display` user.
+- Remove or hide installer shortcuts and terminal favorites if you want fewer escape routes.
+- Prefer wired networking; firewall off services you do not need.
+- For **stronger** kiosk isolation (single full-screen app only, no full desktop), consider a minimal stack (e.g. `cage` or `sway` launching only your app) or your organization’s standard kiosk image — that is separate from this repo.
+
+The app is not a substitute for OS-level kiosk design.
 
 ## Current status
 
-The app now uses OpenClaw's existing pairing and gateway event stream.
+The app uses OpenClaw’s pairing and gateway event stream.
 
-The remaining work in this repo is mostly productization:
-
-1. polish the pairing UX further
-2. package signed installers for Linux, Windows, and macOS
-3. add auto-start and kiosk-oriented deployment guidance
+Remaining productization work includes polish, signed installers, and optional auto-start packaging.
