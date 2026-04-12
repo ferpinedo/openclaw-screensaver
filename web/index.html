@@ -85,7 +85,6 @@
       font-size: clamp(28px, 3vw, 56px);
       font-weight: 700;
       letter-spacing: 0.04em;
-      text-transform: uppercase;
     }
 
     .brand .subtitle,
@@ -547,7 +546,7 @@
   <div class="hud">
     <div class="topline">
       <div class="brand">
-        <div class="title">OpenClaw</div>
+        <div class="title" id="brandTitle">OpenClaw</div>
         <div class="subtitle">activity screen</div>
       </div>
 
@@ -612,6 +611,12 @@
           </div>
 
           <div class="field">
+            <label for="screenTitle">Screen title</label>
+            <input id="screenTitle" name="screenTitle" type="text" placeholder="OpenClaw" autocomplete="off" />
+            <div class="field-note">Large heading at the top of the display (this machine only).</div>
+          </div>
+
+          <div class="field">
             <label for="gatewayToken">Gateway token</label>
             <input id="gatewayToken" name="gatewayToken" type="password" placeholder="optional" autocomplete="off" />
             <div class="field-note">Advanced mode. If you use a setup code you usually do not need to paste this.</div>
@@ -659,6 +664,7 @@
       gatewayUrl: '',
       gatewayToken: '',
       displayName: 'Lobby Screen',
+      screenTitle: 'OpenClaw',
       bootstrapToken: '',
       deviceToken: '',
       deviceScopes: [...DEFAULT_OPERATOR_SCOPES],
@@ -693,6 +699,8 @@
     const setupCodeInput = document.getElementById('setupCode');
     const gatewayUrlInput = document.getElementById('gatewayUrl');
     const displayNameInput = document.getElementById('displayName');
+    const screenTitleInput = document.getElementById('screenTitle');
+    const brandTitle = document.getElementById('brandTitle');
     const gatewayTokenInput = document.getElementById('gatewayToken');
 
     let w = canvas.width = window.innerWidth;
@@ -804,6 +812,9 @@
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
+          screenTitle: typeof parsed?.screenTitle === 'string' && parsed.screenTitle.trim()
+            ? parsed.screenTitle.trim()
+            : DEFAULT_SETTINGS.screenTitle,
           deviceScopes: Array.isArray(parsed?.deviceScopes) && parsed.deviceScopes.length > 0 ? parsed.deviceScopes : [...DEFAULT_OPERATOR_SCOPES],
         };
       } catch (error) {
@@ -819,12 +830,14 @@
       };
       window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
       hydrateSettingsForm();
+      applyBrandTitle();
     }
 
     function clearSettings() {
       window.localStorage.removeItem(SETTINGS_KEY);
       state.settings = { ...DEFAULT_SETTINGS };
       hydrateSettingsForm();
+      applyBrandTitle();
     }
 
     function base64UrlEncode(input) {
@@ -1116,7 +1129,13 @@
       setupCodeInput.value = state.settings.setupCode;
       gatewayUrlInput.value = state.settings.gatewayUrl;
       displayNameInput.value = state.settings.displayName;
+      screenTitleInput.value = state.settings.screenTitle || DEFAULT_SETTINGS.screenTitle;
       gatewayTokenInput.value = state.settings.gatewayToken;
+    }
+
+    function applyBrandTitle() {
+      const raw = (state.settings.screenTitle || DEFAULT_SETTINGS.screenTitle || '').trim();
+      brandTitle.textContent = raw || DEFAULT_SETTINGS.screenTitle;
     }
 
     function openSettings(force = false) {
@@ -1203,6 +1222,7 @@
         gatewayUrl: formData.gatewayUrl.trim(),
         gatewayToken: formData.gatewayToken.trim(),
         displayName: formData.displayName.trim() || DEFAULT_SETTINGS.displayName,
+        screenTitle: (formData.screenTitle != null ? String(formData.screenTitle) : '').trim() || DEFAULT_SETTINGS.screenTitle,
       };
 
       let decodedSetup = null;
@@ -1445,30 +1465,121 @@
       scheduleReconnect('Connection lost');
     }
 
+    function tryParseJsonLoose(value) {
+      if (typeof value !== 'string') return null;
+      const t = value.trim();
+      if (!t || (t[0] !== '{' && t[0] !== '[')) return null;
+      try {
+        return JSON.parse(t);
+      } catch {
+        return null;
+      }
+    }
+
+    function isJsonLikeString(s) {
+      if (typeof s !== 'string') return false;
+      const t = s.trim();
+      return (t.startsWith('{') && t.includes('"')) || (t.startsWith('[') && t.length > 2);
+    }
+
     function extractMessageText(message) {
       if (!message || typeof message !== 'object') return '';
-      if (typeof message.content === 'string') return message.content.trim();
+      if (typeof message.content === 'string') {
+        const c = message.content.trim();
+        const parsed = tryParseJsonLoose(c);
+        if (parsed !== null) {
+          if (typeof parsed === 'string') return parsed.trim();
+          if (typeof parsed === 'object') return extractMessageText({ ...message, content: parsed });
+        }
+        if (isJsonLikeString(c)) return '';
+        return c;
+      }
       if (Array.isArray(message.content)) {
-        const parts = message.content
-          .map((entry) => typeof entry?.text === 'string' ? entry.text.trim() : '')
-          .filter(Boolean);
+        const parts = message.content.map((entry) => {
+          if (typeof entry === 'string') {
+            const p = tryParseJsonLoose(entry);
+            if (p && typeof p === 'object') return extractMessageText({ content: p });
+            return entry.trim();
+          }
+          if (entry && typeof entry === 'object') {
+            if (typeof entry.text === 'string') return entry.text.trim();
+            if (entry.type === 'text' && typeof entry.text === 'string') return entry.text.trim();
+          }
+          return '';
+        }).filter(Boolean);
         if (parts.length > 0) return parts.join(' ');
       }
-      if (typeof message.text === 'string') return message.text.trim();
+      if (typeof message.text === 'string') {
+        const t = message.text.trim();
+        const parsed = tryParseJsonLoose(t);
+        if (parsed !== null && typeof parsed === 'object') return extractMessageText(parsed);
+        if (isJsonLikeString(t)) return '';
+        return t;
+      }
       return '';
+    }
+
+    function previewItemPlainText(item) {
+      if (!item || typeof item !== 'object') return '';
+      if (typeof item.text === 'string') {
+        const t = item.text.trim();
+        if (!t) return '';
+        const parsed = tryParseJsonLoose(t);
+        if (parsed !== null && typeof parsed === 'object') {
+          const inner = extractMessageText(parsed);
+          if (inner) return inner;
+        }
+        if (isJsonLikeString(t)) return '';
+        return t;
+      }
+      return extractMessageText(item);
     }
 
     function pickPreviewItem(items) {
       if (!Array.isArray(items) || items.length === 0) return null;
       for (let index = items.length - 1; index >= 0; index -= 1) {
         const item = items[index];
-        if (item?.role === 'user' && typeof item.text === 'string' && item.text.trim()) return item;
+        if (item?.role === 'user' && previewItemPlainText(item)) return item;
       }
       for (let index = items.length - 1; index >= 0; index -= 1) {
         const item = items[index];
-        if (typeof item?.text === 'string' && item.text.trim()) return item;
+        if (previewItemPlainText(item)) return item;
       }
       return null;
+    }
+
+    function briefSessionActivityLine(role, sessionLabel) {
+      const label = (sessionLabel || 'Chat').trim() || 'Chat';
+      if (role === 'user') return `New message — ${label}`;
+      if (role === 'assistant') return `Assistant reply — ${label}`;
+      return `Activity — ${label}`;
+    }
+
+    function chatParticipantLabel(message, fallbackThread) {
+      const thread = (fallbackThread || 'Chat').trim() || 'Chat';
+      if (!message || typeof message !== 'object') return thread;
+      const name = typeof message.name === 'string' && message.name.trim()
+        ? message.name.trim()
+        : typeof message.author === 'string' && message.author.trim()
+          ? message.author.trim()
+          : '';
+      if (name) return name;
+      return thread;
+    }
+
+    function briefChatFinalLine(payload) {
+      const message = payload.message;
+      const thread = (payload.displayName || payload.label || payload.sessionKey || 'Chat').toString().trim() || 'Chat';
+      const who = chatParticipantLabel(message, thread);
+      const text = extractMessageText(message);
+      const role = typeof message?.role === 'string' ? message.role : '';
+      if (text && !isJsonLikeString(text) && text.length <= 180) {
+        const short = text.length > 90 ? `${text.slice(0, 90)}…` : text;
+        return role === 'user' ? `Message from ${who}: ${short}` : `${short}`;
+      }
+      if (role === 'user') return `New message from ${who}`;
+      if (role === 'assistant') return `Assistant reply — ${thread}`;
+      return `Chat update — ${thread}`;
     }
 
     function formatCronMessage(payload) {
@@ -1528,7 +1639,9 @@
         const item = pickPreviewItem(preview?.items);
         if (!item) return;
 
-        const fingerprint = `${payload.messageSeq ?? 0}:${item.role}:${item.text}`;
+        const plain = previewItemPlainText(item);
+        const label = (payload.displayName || payload.label || 'Chat').toString().trim() || 'Chat';
+        const fingerprint = `${payload.messageSeq ?? 0}:${item.role}:${plain.slice(0, 80)}`;
         if (previous?.fingerprint === fingerprint) return;
 
         state.sessionActivity.set(sessionKey, {
@@ -1536,12 +1649,11 @@
           fingerprint,
         });
 
-        const label = payload.displayName || payload.label || 'message';
         const kind = item.role === 'user' ? 'message' : 'event';
         setActivityState({
           kind,
           source: label,
-          message: `${label}: ${item.text}`,
+          message: briefSessionActivityLine(item.role, label),
           duration_ms: 15000,
           last_event_ts: Date.now(),
         });
@@ -1565,12 +1677,10 @@
         return;
       }
       if (frame.event === 'chat' && payload.state === 'final' && payload.message) {
-        const text = extractMessageText(payload.message);
-        if (!text) return;
         setActivityState({
           kind: 'event',
           source: 'agent',
-          message: text,
+          message: briefChatFinalLine(payload),
           duration_ms: 10000,
           last_event_ts: Date.now(),
         });
@@ -1766,6 +1876,7 @@
         gatewayUrl: gatewayUrlInput.value,
         gatewayToken: gatewayTokenInput.value,
         displayName: displayNameInput.value,
+        screenTitle: screenTitleInput.value,
       };
 
       if (!String(formData.gatewayToken || '').trim() && !state.settings.gatewayToken.trim()) {
@@ -1914,6 +2025,7 @@
         hostname: window.location.hostname,
       });
       hydrateSettingsForm();
+      applyBrandTitle();
       if (state.settings.gatewayUrl) {
         debugStep('boot:auto-connect', state.settings.gatewayUrl);
         connectToOpenClaw();
