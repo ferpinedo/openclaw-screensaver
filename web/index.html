@@ -131,7 +131,12 @@
       box-shadow: 0 0 16px #7fffd4;
     }
 
-    body.busy .dot {
+    .status-wrap .dot.connected {
+      background: #34d399;
+      box-shadow: 0 0 16px rgba(52, 211, 153, 0.95), 0 0 28px rgba(52, 211, 153, 0.35);
+    }
+
+    body.busy .status-wrap .dot {
       background: var(--busy);
       box-shadow: 0 0 18px var(--busy), 0 0 42px rgba(255, 209, 102, 0.5);
       animation: alert 0.8s ease-in-out infinite;
@@ -552,7 +557,7 @@
 
       <div class="status-stack">
         <div class="status-wrap">
-          <div class="dot"></div>
+          <div class="dot" id="statusDot"></div>
           <div class="status" id="statusText">idle</div>
         </div>
 
@@ -677,6 +682,7 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const statusText = document.getElementById('statusText');
+    const statusDot = document.getElementById('statusDot');
     const connectionWrap = document.getElementById('connectionWrap');
     const connectionText = document.getElementById('connectionText');
     const eventText = document.getElementById('eventText');
@@ -1119,9 +1125,14 @@
     function setConnectionState(kind, text) {
       state.connectionState = kind;
       state.connectionHint = text;
+      const isLive = kind === 'live';
+      connectionWrap.hidden = isLive;
       connectionWrap.classList.remove('online', 'offline', 'connecting', 'retrying', 'setup');
-      connectionWrap.classList.add(kind === 'live' ? 'online' : kind);
-      connectionText.textContent = text;
+      if (!isLive) {
+        connectionWrap.classList.add(kind);
+      }
+      connectionText.textContent = isLive ? '' : text;
+      statusDot.classList.toggle('connected', isLive);
       debugStep('connection-state', { kind, text });
     }
 

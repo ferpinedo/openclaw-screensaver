@@ -112,17 +112,48 @@ Then open `http://localhost:8765`.
 You need:
 
 - Node.js
-- Rust toolchain
+- Rust toolchain (`cargo` must be on your `PATH` when you run `npm run build`)
 - Tauri prerequisites for your OS
 
 Install the official Tauri prerequisites before building, especially on Linux where system packages are required.
+
+### Install Rust so `cargo` is available
+
+If you see:
+
+`failed to run command cargo metadata ... No such file or directory (os error 2)`
+
+then `cargo` is missing from the environment `npm` uses. Install Rust with [rustup](https://rustup.rs/) (recommended):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Then load Cargo into your **current** shell and confirm:
+
+```bash
+source "$HOME/.cargo/env"
+command -v cargo
+```
+
+To make that permanent for new terminals, add this line to `~/.bashrc` or `~/.profile`:
+
+```bash
+source "$HOME/.cargo/env"
+```
+
+Build after a fresh login, or always run:
+
+```bash
+source "$HOME/.cargo/env" && npm run build
+```
+
+### Run and build
 
 ```bash
 npm install
 npm run dev
 ```
-
-Build installers for the current platform (ensure `cargo` is on your `PATH`, e.g. `source "$HOME/.cargo/env"`):
 
 ```bash
 npm run build
