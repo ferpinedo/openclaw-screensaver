@@ -644,7 +644,7 @@
     </div>
   </div>
 
-  <div class="debug-panel" id="debugPanel">
+  <div class="debug-panel hidden" id="debugPanel" aria-hidden="true">
     <div class="debug-header">
       <div class="debug-title">Diagnostics</div>
       <div class="debug-actions">
@@ -728,7 +728,7 @@
       connectionState: 'setup',
       connectionHint: 'Configure OpenClaw with Ctrl+,',
       settingsOpen: false,
-      diagnosticsPanelVisible: true,
+      diagnosticsPanelVisible: false,
       legacyPolling: false,
       connectNonce: '',
       connectSent: false,
