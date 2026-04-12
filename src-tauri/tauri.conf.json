@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OpenClaw Activity Screen",
+  "version": "0.1.0",
+  "identifier": "com.openclaw.activityscreen",
+  "build": {
+    "frontendDist": "../web"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "OpenClaw Activity Screen",
+        "useHttpsScheme": false,
+        "fullscreen": true,
+        "resizable": false,
+        "decorations": false,
+        "visible": true,
+        "focus": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity"
+  }
+}

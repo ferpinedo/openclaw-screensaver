@@ -1,0 +1,1917 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenClaw Activity Screen</title>
+  <style>
+    :root {
+      --bg1: #07111f;
+      --bg2: #0d233e;
+      --ink: #dff6ff;
+      --muted: #8eb9d6;
+      --accent: #66e3ff;
+      --accent-soft: rgba(102, 227, 255, 0.18);
+      --busy: #ffd166;
+      --warn: #ff8f70;
+      --panel: rgba(4, 12, 22, 0.76);
+      --border: rgba(255, 255, 255, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 30% 20%, #17345a 0%, var(--bg2) 35%, var(--bg1) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body.busy {
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255, 209, 102, 0.18) 0%, transparent 30%),
+        radial-gradient(circle at 80% 35%, rgba(255, 209, 102, 0.12) 0%, transparent 28%),
+        radial-gradient(circle at 50% 50%, #1b2c45 0%, #0b1423 68%, #050a12 100%);
+    }
+
+    body.settings-open {
+      overflow: hidden;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    #canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      padding: 28px;
+    }
+
+    .topline {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      opacity: 0.92;
+      user-select: none;
+    }
+
+    .brand .title {
+      font-size: clamp(28px, 3vw, 56px);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .brand .subtitle,
+    .meta {
+      color: var(--muted);
+      font-size: clamp(12px, 1vw, 18px);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .status-stack {
+      align-self: start;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    .status-wrap,
+    .connection-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.18);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+      max-width: min(48vw, 560px);
+    }
+
+    .dot,
+    .connection-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      animation: breathe 2.4s ease-in-out infinite;
+      flex: 0 0 auto;
+    }
+
+    .dot {
+      background: #7fffd4;
+      box-shadow: 0 0 16px #7fffd4;
+    }
+
+    body.busy .dot {
+      background: var(--busy);
+      box-shadow: 0 0 18px var(--busy), 0 0 42px rgba(255, 209, 102, 0.5);
+      animation: alert 0.8s ease-in-out infinite;
+    }
+
+    .connection-dot {
+      background: var(--warn);
+      box-shadow: 0 0 14px rgba(255, 143, 112, 0.9);
+    }
+
+    .connection-wrap.online .connection-dot {
+      background: var(--accent);
+      box-shadow: 0 0 14px rgba(102, 227, 255, 0.9);
+    }
+
+    .connection-wrap.connecting .connection-dot,
+    .connection-wrap.retrying .connection-dot {
+      background: var(--busy);
+      box-shadow: 0 0 14px rgba(255, 209, 102, 0.85);
+    }
+
+    .status {
+      font-size: clamp(14px, 1.2vw, 20px);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .connection-copy {
+      display: grid;
+      gap: 2px;
+    }
+
+    .connection-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .connection-text {
+      font-size: clamp(12px, 1vw, 16px);
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: min(36vw, 420px);
+    }
+
+    .bottomline {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .event-box {
+      max-width: min(48vw, 720px);
+      padding: 16px 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(3, 12, 22, 0.45);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+    }
+
+    .event-label {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .event-text {
+      font-size: clamp(18px, 2vw, 34px);
+      line-height: 1.2;
+      font-weight: 700;
+      text-wrap: balance;
+    }
+
+    .clock {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 24px rgba(102, 227, 255, 0.12);
+    }
+
+    .clock .time {
+      font-size: clamp(40px, 6vw, 100px);
+      font-weight: 800;
+      line-height: 0.9;
+      letter-spacing: -0.04em;
+    }
+
+    .clock .date {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: clamp(14px, 1.2vw, 20px);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .setup-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(2, 8, 15, 0.58);
+      backdrop-filter: blur(14px);
+      z-index: 10;
+    }
+
+    body.settings-open .setup-overlay {
+      display: flex;
+    }
+
+    .setup-card {
+      width: min(720px, 100%);
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+    }
+
+    .setup-header {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .setup-title {
+      font-size: clamp(26px, 4vw, 40px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .setup-copy {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+      max-width: 58ch;
+    }
+
+    .setup-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field.wide {
+      grid-column: 1 / -1;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(6, 17, 29, 0.78);
+      color: var(--ink);
+      outline: none;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    .field input:focus {
+      border-color: rgba(102, 227, 255, 0.5);
+      box-shadow: 0 0 0 4px rgba(102, 227, 255, 0.12);
+    }
+
+    .field-note,
+    .setup-hint,
+    .setup-error {
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .field-note,
+    .setup-hint {
+      color: var(--muted);
+    }
+
+    .setup-error {
+      min-height: 20px;
+      color: #ffb3a1;
+    }
+
+    .setup-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      cursor: pointer;
+      color: #04111f;
+      background: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(102, 227, 255, 0.24);
+    }
+
+    .button.secondary {
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .button.ghost {
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .setup-hint {
+      margin-top: 18px;
+    }
+
+    .debug-panel {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      z-index: 30;
+      width: min(560px, calc(100vw - 36px));
+      max-height: min(42vh, 420px);
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(3, 10, 18, 0.86);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+      pointer-events: auto;
+    }
+
+    .debug-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .debug-title {
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .debug-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .debug-button {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .debug-summary,
+    .debug-log {
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 12px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .debug-summary {
+      max-height: 120px;
+    }
+
+    .debug-log {
+      min-height: 120px;
+    }
+
+    @media (max-width: 900px) {
+      .hud {
+        padding: 20px;
+      }
+
+      .topline,
+      .bottomline {
+        gap: 12px;
+      }
+
+      .bottomline {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .event-box,
+      .status-wrap,
+      .connection-wrap {
+        max-width: none;
+      }
+
+      .status-stack {
+        width: min(58vw, 360px);
+      }
+
+      .setup-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .debug-panel {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: auto;
+        max-height: 45vh;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topline {
+        flex-direction: column;
+      }
+
+      .status-stack {
+        width: 100%;
+        align-items: stretch;
+      }
+
+      .connection-text {
+        max-width: none;
+      }
+
+      .setup-card {
+        padding: 22px;
+      }
+
+      .setup-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .button {
+        width: 100%;
+      }
+    }
+
+    @keyframes breathe {
+      0%,
+      100% {
+        transform: scale(0.88);
+        opacity: 0.72;
+      }
+
+      50% {
+        transform: scale(1.15);
+        opacity: 1;
+      }
+    }
+
+    @keyframes alert {
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 0.8;
+      }
+
+      50% {
+        transform: scale(1.35);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="hud">
+    <div class="topline">
+      <div class="brand">
+        <div class="title">OpenClaw</div>
+        <div class="subtitle">activity screen</div>
+      </div>
+
+      <div class="status-stack">
+        <div class="status-wrap">
+          <div class="dot"></div>
+          <div class="status" id="statusText">idle</div>
+        </div>
+
+        <div class="connection-wrap" id="connectionWrap">
+          <div class="connection-dot"></div>
+          <div class="connection-copy">
+            <div class="connection-label">connection</div>
+            <div class="connection-text" id="connectionText">Configure OpenClaw with Ctrl+,</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottomline">
+      <div class="event-box">
+        <div class="event-label">latest event</div>
+        <div class="event-text" id="eventText">Waiting for activity...</div>
+      </div>
+
+      <div class="clock">
+        <div class="time" id="timeText">--:--</div>
+        <div class="date" id="dateText">----</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="setup-overlay" id="setupOverlay">
+    <div class="setup-card" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+      <div class="setup-header">
+        <div class="setup-title" id="setupTitle">Connect this screen to OpenClaw</div>
+        <div class="setup-copy">
+          This app uses OpenClaw's real gateway WebSocket. The easiest path is to paste a setup code generated with
+          <code>openclaw qr --setup-code-only</code> or from the <code>/pair</code> plugin. The first connection creates a
+          pairing request that you approve with <code>openclaw devices approve &lt;requestId&gt;</code>.
+        </div>
+      </div>
+
+      <form id="settingsForm">
+        <div class="setup-grid">
+          <div class="field wide">
+            <label for="setupCode">Setup code</label>
+            <input id="setupCode" name="setupCode" type="text" placeholder="eyJ1cmwiOiJ3c3M6Ly8uLi4iLCJib290c3RyYXBUb2tlbiI6Ii4uLiJ9" autocomplete="off" />
+            <div class="field-note">Recommended. Generate it with <code>openclaw qr --setup-code-only</code>.</div>
+          </div>
+
+          <div class="field wide">
+            <label for="gatewayUrl">Gateway URL</label>
+            <input id="gatewayUrl" name="gatewayUrl" type="text" placeholder="wss://openclaw.example.com:18789" autocomplete="off" />
+            <div class="field-note">Optional if you paste a setup code. Accepts <code>ws://</code>, <code>wss://</code>, <code>http://</code>, and <code>https://</code>.</div>
+          </div>
+
+          <div class="field">
+            <label for="displayName">Display name</label>
+            <input id="displayName" name="displayName" type="text" placeholder="Lobby Screen" autocomplete="organization-title" />
+            <div class="field-note">Visible name used in pairing and gateway presence.</div>
+          </div>
+
+          <div class="field">
+            <label for="gatewayToken">Gateway token</label>
+            <input id="gatewayToken" name="gatewayToken" type="password" placeholder="optional" autocomplete="off" />
+            <div class="field-note">Advanced mode. If you use a setup code you usually do not need to paste this.</div>
+          </div>
+        </div>
+
+        <div class="setup-actions">
+          <button class="button" type="submit">Save and connect</button>
+          <button class="button secondary" type="button" id="localButton">Use local OpenClaw</button>
+          <button class="button secondary" type="button" id="retryButton">Retry now</button>
+          <button class="button secondary" type="button" id="demoButton">Demo event</button>
+          <button class="button ghost" type="button" id="resetDeviceButton">Reset device identity</button>
+          <button class="button ghost" type="button" id="clearButton">Clear settings</button>
+          <button class="button ghost" type="button" id="closeButton">Close</button>
+        </div>
+
+        <div class="setup-hint">Shortcut: <code>Ctrl+,</code> opens these settings at any time. For local development without the gateway, run <code>./start.sh</code>.</div>
+        <div class="setup-error" id="setupError" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="debug-panel" id="debugPanel">
+    <div class="debug-header">
+      <div class="debug-title">Diagnostics</div>
+      <div class="debug-actions">
+        <button class="debug-button" type="button" id="copyDebugButton">Copy</button>
+        <button class="debug-button" type="button" id="clearDebugButton">Clear</button>
+      </div>
+    </div>
+    <div class="debug-summary" id="debugSummary">Preparing diagnostics...</div>
+    <div class="debug-log" id="debugLog">Waiting for runtime logs...</div>
+  </div>
+
+  <script>
+    const SETTINGS_KEY = 'openclaw.activity-screen.settings';
+    const DEVICE_IDENTITY_KEY = 'openclaw.activity-screen.device-identity';
+    const LOCAL_GATEWAY_URL = 'ws://127.0.0.1:18789';
+    const GATEWAY_CLIENT_ID = 'openclaw-control-ui';
+    const GATEWAY_CLIENT_MODE = 'webchat';
+    const DEFAULT_OPERATOR_SCOPES = ['operator.read'];
+    const CLIENT_INSTANCE_ID = window.crypto.randomUUID();
+    const DEFAULT_SETTINGS = {
+      setupCode: '',
+      gatewayUrl: '',
+      gatewayToken: '',
+      displayName: 'Lobby Screen',
+      bootstrapToken: '',
+      deviceToken: '',
+      deviceScopes: [...DEFAULT_OPERATOR_SCOPES],
+      pairRequestId: '',
+    };
+
+    const textEncoder = new TextEncoder();
+    const textDecoder = new TextDecoder();
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+    const connectionWrap = document.getElementById('connectionWrap');
+    const connectionText = document.getElementById('connectionText');
+    const eventText = document.getElementById('eventText');
+    const timeText = document.getElementById('timeText');
+    const dateText = document.getElementById('dateText');
+    const setupOverlay = document.getElementById('setupOverlay');
+    const settingsForm = document.getElementById('settingsForm');
+    const setupError = document.getElementById('setupError');
+    const debugSummary = document.getElementById('debugSummary');
+    const debugLog = document.getElementById('debugLog');
+    const copyDebugButton = document.getElementById('copyDebugButton');
+    const clearDebugButton = document.getElementById('clearDebugButton');
+    const localButton = document.getElementById('localButton');
+    const retryButton = document.getElementById('retryButton');
+    const demoButton = document.getElementById('demoButton');
+    const resetDeviceButton = document.getElementById('resetDeviceButton');
+    const clearButton = document.getElementById('clearButton');
+    const closeButton = document.getElementById('closeButton');
+    const setupCodeInput = document.getElementById('setupCode');
+    const gatewayUrlInput = document.getElementById('gatewayUrl');
+    const displayNameInput = document.getElementById('displayName');
+    const gatewayTokenInput = document.getElementById('gatewayToken');
+
+    let w = canvas.width = window.innerWidth;
+    let h = canvas.height = window.innerHeight;
+    let cx = w / 2;
+    let cy = h / 2;
+
+    const state = {
+      mode: 'idle',
+      source: 'system',
+      message: 'Waiting for activity...',
+      lastEventAt: null,
+      busyUntil: 0,
+      particles: [],
+      socket: null,
+      reconnectTimer: null,
+      reconnectDelay: 2000,
+      connectChallengeTimer: null,
+      connectionState: 'setup',
+      connectionHint: 'Configure OpenClaw with Ctrl+,',
+      settingsOpen: false,
+      legacyPolling: false,
+      connectNonce: '',
+      connectSent: false,
+      ignoreNextClose: false,
+      closeHandled: false,
+      pendingDeviceTokenRetry: false,
+      pendingRequests: new Map(),
+      sessionActivity: new Map(),
+      settings: loadSettings(),
+      debug: {
+        currentStep: 'boot',
+        lastError: '',
+        nativePath: 'unknown',
+        lastSocketUrl: '',
+        lastClose: '',
+        entries: [],
+      },
+    };
+
+    function safeStringify(value) {
+      if (typeof value === 'string') return value;
+      try {
+        return JSON.stringify(value);
+      } catch (error) {
+        return String(value);
+      }
+    }
+
+    function updateDebugPanel() {
+      const summaryLines = [
+        `href: ${window.location.href}`,
+        `origin: ${window.location.origin}`,
+        `protocol: ${window.location.protocol}`,
+        `hostname: ${window.location.hostname}`,
+        `isPackagedDesktopApp: ${isPackagedDesktopApp()}`,
+        `__TAURI__: ${Boolean(window.__TAURI__)}`,
+        `__TAURI_INTERNALS__: ${Boolean(window.__TAURI_INTERNALS__)}`,
+        `tauriInvoke: ${Boolean(getTauriInvoke())}`,
+        `crypto.subtle: ${Boolean(window.crypto?.subtle)}`,
+        `connectionState: ${state.connectionState}`,
+        `currentStep: ${state.debug.currentStep}`,
+        `nativePath: ${state.debug.nativePath}`,
+        `gatewayUrl: ${state.settings.gatewayUrl || '<empty>'}`,
+        `lastSocketUrl: ${state.debug.lastSocketUrl || '<none>'}`,
+        `lastClose: ${state.debug.lastClose || '<none>'}`,
+        `lastError: ${state.debug.lastError || '<none>'}`,
+      ];
+      debugSummary.textContent = summaryLines.join('\n');
+      debugLog.textContent = state.debug.entries.length > 0
+        ? state.debug.entries.join('\n')
+        : 'Waiting for runtime logs...';
+      debugLog.scrollTop = debugLog.scrollHeight;
+    }
+
+    function debugStep(step, details) {
+      state.debug.currentStep = step;
+      const stamp = new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      const line = details === undefined || details === ''
+        ? `[${stamp}] ${step}`
+        : `[${stamp}] ${step}: ${safeStringify(details)}`;
+      state.debug.entries.push(line);
+      if (state.debug.entries.length > 80) state.debug.entries.shift();
+      updateDebugPanel();
+    }
+
+    function debugError(step, error) {
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      state.debug.lastError = message;
+      debugStep(step, message);
+    }
+
+    function loadSettings() {
+      try {
+        const raw = window.localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return { ...DEFAULT_SETTINGS };
+        const parsed = JSON.parse(raw);
+        return {
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          deviceScopes: Array.isArray(parsed?.deviceScopes) && parsed.deviceScopes.length > 0 ? parsed.deviceScopes : [...DEFAULT_OPERATOR_SCOPES],
+        };
+      } catch (error) {
+        return { ...DEFAULT_SETTINGS };
+      }
+    }
+
+    function saveSettings(settings) {
+      state.settings = {
+        ...DEFAULT_SETTINGS,
+        ...settings,
+        deviceScopes: Array.isArray(settings.deviceScopes) && settings.deviceScopes.length > 0 ? settings.deviceScopes : [...DEFAULT_OPERATOR_SCOPES],
+      };
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+      hydrateSettingsForm();
+    }
+
+    function clearSettings() {
+      window.localStorage.removeItem(SETTINGS_KEY);
+      state.settings = { ...DEFAULT_SETTINGS };
+      hydrateSettingsForm();
+    }
+
+    function base64UrlEncode(input) {
+      const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+      let binary = '';
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function base64UrlDecode(value) {
+      const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+      const binary = window.atob(padded);
+      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    }
+
+    async function sha256Hex(bytes) {
+      const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function exportRawPublicKey(publicKey) {
+      try {
+        return new Uint8Array(await window.crypto.subtle.exportKey('raw', publicKey));
+      } catch (error) {
+        const spki = new Uint8Array(await window.crypto.subtle.exportKey('spki', publicKey));
+        return spki.slice(-32);
+      }
+    }
+
+    function isPackagedDesktopApp() {
+      return window.location.hostname === 'tauri.localhost'
+        || Boolean(window.__TAURI_INTERNALS__)
+        || Boolean(window.__TAURI__);
+    }
+
+    function getTauriInvoke() {
+      const internalInvoke = window.__TAURI_INTERNALS__?.invoke;
+      if (typeof internalInvoke === 'function') return internalInvoke.bind(window.__TAURI_INTERNALS__);
+      const globalInvoke = window.__TAURI__?.core?.invoke;
+      if (typeof globalInvoke === 'function') return globalInvoke.bind(window.__TAURI__.core);
+      return null;
+    }
+
+    async function invokeNative(command, args = {}) {
+      debugStep('invoke-native:start', { command, args });
+      const tauriInvoke = getTauriInvoke();
+      if (!tauriInvoke) {
+        if (isPackagedDesktopApp()) {
+          const error = new Error('Native Tauri command bridge is unavailable. Reinstall the latest app bundle and try again.');
+          debugError('invoke-native:bridge-missing', error);
+          throw error;
+        }
+        debugStep('invoke-native:fallback-browser', command);
+        return null;
+      }
+
+      try {
+        const result = await tauriInvoke(command, args);
+        state.debug.nativePath = 'tauri';
+        debugStep('invoke-native:ok', command);
+        return result;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const wrapped = new Error(`Native Tauri command failed: ${message}`);
+        debugError('invoke-native:error', wrapped);
+        throw wrapped;
+      }
+    }
+
+    async function loadOrCreateDeviceIdentity() {
+      const nativeIdentity = await invokeNative('load_or_create_device_identity', {});
+      if (nativeIdentity) {
+        debugStep('identity:native', nativeIdentity);
+        return nativeIdentity;
+      }
+
+      try {
+        const raw = window.localStorage.getItem(DEVICE_IDENTITY_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed.deviceId === 'string' && typeof parsed.publicKey === 'string' && typeof parsed.privateKeyPkcs8 === 'string') {
+            return parsed;
+          }
+        }
+      } catch (error) {
+      }
+
+      if (!window.crypto?.subtle) {
+        throw new Error('This runtime does not support WebCrypto for OpenClaw pairing.');
+      }
+
+      state.debug.nativePath = 'browser-webcrypto';
+      debugStep('identity:webcrypto-generate');
+      const keyPair = await window.crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+      const publicKeyRaw = await exportRawPublicKey(keyPair.publicKey);
+      const privateKeyPkcs8 = new Uint8Array(await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey));
+      const identity = {
+        version: 1,
+        deviceId: await sha256Hex(publicKeyRaw),
+        publicKey: base64UrlEncode(publicKeyRaw),
+        privateKeyPkcs8: base64UrlEncode(privateKeyPkcs8),
+        createdAtMs: Date.now(),
+      };
+      window.localStorage.setItem(DEVICE_IDENTITY_KEY, JSON.stringify(identity));
+      debugStep('identity:webcrypto-stored', { deviceId: identity.deviceId });
+      return identity;
+    }
+
+    async function crossVerifySignature(publicKeyB64, signatureB64, payloadStr) {
+      if (!window.crypto?.subtle) return;
+      try {
+        const pubKeyRaw = base64UrlDecode(publicKeyB64);
+        const sigRaw = base64UrlDecode(signatureB64);
+        const pubKey = await window.crypto.subtle.importKey('raw', pubKeyRaw, 'Ed25519', false, ['verify']);
+        const valid = await window.crypto.subtle.verify('Ed25519', pubKey, sigRaw, textEncoder.encode(payloadStr));
+        debugStep('sign:cross-verify', { valid, engine: 'webcrypto' });
+        if (!valid) debugStep('sign:cross-verify-MISMATCH', 'Rust signature did NOT verify via WebCrypto — possible ed25519-dalek incompatibility');
+      } catch (error) {
+        debugError('sign:cross-verify-error', error);
+      }
+    }
+
+    async function signDevicePayload(identity, payload) {
+      const nativeSignature = await invokeNative('sign_device_payload', { payload });
+      if (nativeSignature) {
+        debugStep('sign:native', { deviceId: nativeSignature.deviceId });
+        crossVerifySignature(nativeSignature.publicKey, nativeSignature.signature, payload);
+        return nativeSignature;
+      }
+
+      debugStep('sign:webcrypto', { deviceId: identity.deviceId });
+      const privateKey = await window.crypto.subtle.importKey('pkcs8', base64UrlDecode(identity.privateKeyPkcs8), 'Ed25519', false, ['sign']);
+      const signature = await window.crypto.subtle.sign('Ed25519', privateKey, textEncoder.encode(payload));
+      return {
+        deviceId: identity.deviceId,
+        publicKey: identity.publicKey,
+        signature: base64UrlEncode(new Uint8Array(signature)),
+      };
+    }
+
+    function normalizeDeviceMetadataForAuth(value) {
+      if (typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      return trimmed.replace(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32));
+    }
+
+    function buildDeviceAuthPayloadV3(params) {
+      const scopes = params.scopes.join(',');
+      const token = params.token || '';
+      const platform = normalizeDeviceMetadataForAuth(params.platform);
+      const deviceFamily = normalizeDeviceMetadataForAuth(params.deviceFamily);
+      return [
+        'v3',
+        params.deviceId,
+        params.clientId,
+        params.clientMode,
+        params.role,
+        scopes,
+        String(params.signedAtMs),
+        token,
+        params.nonce,
+        platform,
+        deviceFamily,
+      ].join('|');
+    }
+
+    function decodePairingSetupCode(setupCode) {
+      const normalized = setupCode.replace(/\s+/g, '');
+      const payload = JSON.parse(textDecoder.decode(base64UrlDecode(normalized)));
+      if (!payload || typeof payload !== 'object') throw new Error('Invalid setup code.');
+      if (typeof payload.url !== 'string' || !payload.url.trim()) throw new Error('The setup code does not include a gateway URL.');
+      if (typeof payload.bootstrapToken !== 'string' || !payload.bootstrapToken.trim()) throw new Error('The setup code does not include a bootstrap token.');
+      return {
+        gatewayUrl: normalizeGatewayUrl(payload.url),
+        bootstrapToken: payload.bootstrapToken.trim(),
+      };
+    }
+
+    function normalizeGatewayUrl(value) {
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      const prepared = trimmed.startsWith('http://') ? `ws://${trimmed.slice('http://'.length)}`
+        : trimmed.startsWith('https://') ? `wss://${trimmed.slice('https://'.length)}`
+          : trimmed;
+      const url = new URL(prepared);
+      if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+        throw new Error('The gateway URL must use ws:// or wss://.');
+      }
+      return url.toString();
+    }
+
+    function resolveConnectScopes(authSelection) {
+      if (authSelection.usingStoredDeviceToken && authSelection.storedScopes.length > 0) {
+        return authSelection.storedScopes;
+      }
+      return [...DEFAULT_OPERATOR_SCOPES];
+    }
+
+    function isTrustedDeviceRetryEndpoint() {
+      try {
+        const url = new URL(state.settings.gatewayUrl);
+        return url.protocol === 'wss:' || url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function selectConnectAuth() {
+      const explicitGatewayToken = state.settings.gatewayToken.trim();
+      const explicitBootstrapToken = state.settings.bootstrapToken.trim();
+      const storedToken = state.settings.deviceToken.trim();
+      const storedScopes = Array.isArray(state.settings.deviceScopes) && state.settings.deviceScopes.length > 0 ? state.settings.deviceScopes : [...DEFAULT_OPERATOR_SCOPES];
+      const shouldUseDeviceRetryToken = state.pendingDeviceTokenRetry && Boolean(explicitGatewayToken) && Boolean(storedToken) && isTrustedDeviceRetryEndpoint();
+      const resolvedDeviceToken = shouldUseDeviceRetryToken
+        ? storedToken
+        : (!explicitGatewayToken && Boolean(storedToken) && (!explicitBootstrapToken || Boolean(storedToken)) ? storedToken : '');
+      const usingStoredDeviceToken = Boolean(resolvedDeviceToken) && !shouldUseDeviceRetryToken;
+      const authToken = explicitGatewayToken || resolvedDeviceToken || '';
+      const authBootstrapToken = !authToken ? explicitBootstrapToken || '' : '';
+      return {
+        authToken,
+        authBootstrapToken,
+        authDeviceToken: shouldUseDeviceRetryToken ? storedToken : resolvedDeviceToken,
+        signatureToken: authToken || authBootstrapToken || '',
+        storedScopes,
+        usingStoredDeviceToken,
+      };
+    }
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+      cx = w / 2;
+      cy = h / 2;
+    }
+    window.addEventListener('resize', resize);
+
+    function makeParticles(count = 140) {
+      state.particles = Array.from({ length: count }, (_, index) => ({
+        angle: (Math.PI * 2 * index) / count,
+        radius: 90 + Math.random() * Math.min(w, h) * 0.34,
+        speed: 0.0008 + Math.random() * 0.0018,
+        size: 1 + Math.random() * 3,
+        drift: Math.random() * 2000,
+      }));
+    }
+    makeParticles();
+
+    function resolveStatusLabel(kind) {
+      if (kind === 'cron') return 'cron / active';
+      if (kind === 'message') return 'message / active';
+      return 'event / active';
+    }
+
+    function setActivityState(payload) {
+      const now = Date.now();
+      const kind = payload.kind || 'message';
+      const duration = Number(payload.duration_ms || 15000);
+      state.mode = 'busy';
+      state.source = payload.source || (kind === 'cron' ? 'cron' : 'openclaw');
+      state.message = payload.message || (kind === 'cron' ? 'Cron job finished' : 'Activity detected');
+      state.lastEventAt = payload.last_event_ts || now;
+      state.busyUntil = now + duration;
+      eventText.textContent = state.message;
+      statusText.textContent = resolveStatusLabel(kind);
+      document.body.classList.add('busy');
+    }
+
+    function normalizeIdle() {
+      if (Date.now() > state.busyUntil) {
+        state.mode = 'idle';
+        statusText.textContent = 'idle';
+        document.body.classList.remove('busy');
+      }
+    }
+
+    function setConnectionState(kind, text) {
+      state.connectionState = kind;
+      state.connectionHint = text;
+      connectionWrap.classList.remove('online', 'offline', 'connecting', 'retrying', 'setup');
+      connectionWrap.classList.add(kind === 'live' ? 'online' : kind);
+      connectionText.textContent = text;
+      debugStep('connection-state', { kind, text });
+    }
+
+    function hydrateSettingsForm() {
+      setupCodeInput.value = state.settings.setupCode;
+      gatewayUrlInput.value = state.settings.gatewayUrl;
+      displayNameInput.value = state.settings.displayName;
+      gatewayTokenInput.value = state.settings.gatewayToken;
+    }
+
+    function openSettings(force = false) {
+      state.settingsOpen = true;
+      document.body.classList.add('settings-open');
+      closeButton.hidden = force && !state.legacyPolling;
+      setupOverlay.hidden = false;
+      setupError.textContent = '';
+      hydrateSettingsForm();
+      window.setTimeout(() => {
+        setupCodeInput.focus();
+      }, 0);
+    }
+
+    function closeSettings() {
+      if (!state.settings.gatewayUrl && !state.legacyPolling) {
+        setConnectionState('setup', 'Configure OpenClaw to connect this screen');
+      }
+      state.settingsOpen = false;
+      document.body.classList.remove('settings-open');
+      setupOverlay.hidden = true;
+      setupError.textContent = '';
+    }
+
+    function clearReconnectTimer() {
+      if (state.reconnectTimer) {
+        window.clearTimeout(state.reconnectTimer);
+        state.reconnectTimer = null;
+      }
+    }
+
+    function clearConnectChallengeTimeout() {
+      if (state.connectChallengeTimer) {
+        window.clearTimeout(state.connectChallengeTimer);
+        state.connectChallengeTimer = null;
+      }
+    }
+
+    function flushPendingRequests(error) {
+      for (const [id, pending] of state.pendingRequests.entries()) {
+        window.clearTimeout(pending.timeout);
+        pending.reject(error);
+        state.pendingRequests.delete(id);
+      }
+    }
+
+    function stopSocket() {
+      debugStep('socket:stop');
+      clearReconnectTimer();
+      clearConnectChallengeTimeout();
+      state.connectNonce = '';
+      state.connectSent = false;
+      flushPendingRequests(new Error('gateway disconnected'));
+      if (!state.socket) return;
+      const socket = state.socket;
+      state.socket = null;
+      state.ignoreNextClose = true;
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      safeCloseSocket(socket, undefined, undefined, 'socket:stop-close');
+    }
+
+    function safeCloseSocket(socket, code, reason, step) {
+      if (!socket) return;
+      try {
+        socket.close();
+      } catch (error) {
+        debugError(step || 'socket:close-error', error);
+      }
+    }
+
+    function resolvePlatformLabel() {
+      const uaPlatform = window.navigator.userAgentData?.platform;
+      const platform = typeof uaPlatform === 'string' && uaPlatform.trim() ? uaPlatform : window.navigator.platform || 'unknown';
+      return String(platform);
+    }
+
+    function normalizeSettings(formData) {
+      const next = {
+        ...state.settings,
+        setupCode: formData.setupCode.trim(),
+        gatewayUrl: formData.gatewayUrl.trim(),
+        gatewayToken: formData.gatewayToken.trim(),
+        displayName: formData.displayName.trim() || DEFAULT_SETTINGS.displayName,
+      };
+
+      let decodedSetup = null;
+      if (next.setupCode) decodedSetup = decodePairingSetupCode(next.setupCode);
+      if (decodedSetup) {
+        next.gatewayUrl = decodedSetup.gatewayUrl;
+        next.bootstrapToken = decodedSetup.bootstrapToken;
+      } else {
+        next.bootstrapToken = '';
+      }
+
+      if (next.gatewayUrl) next.gatewayUrl = normalizeGatewayUrl(next.gatewayUrl);
+
+      if (!next.gatewayUrl) {
+        throw new Error('Paste a setup code or a valid gateway URL.');
+      }
+
+      const gatewayChanged = Boolean(state.settings.gatewayUrl) && state.settings.gatewayUrl !== next.gatewayUrl;
+      const bootstrapChanged = Boolean(next.bootstrapToken) && next.bootstrapToken !== state.settings.bootstrapToken;
+      if (gatewayChanged || bootstrapChanged) {
+        next.deviceToken = '';
+        next.deviceScopes = [...DEFAULT_OPERATOR_SCOPES];
+        next.pairRequestId = '';
+      }
+
+      return next;
+    }
+
+    function fillLocalOpenClawSettings() {
+      setupCodeInput.value = '';
+      gatewayUrlInput.value = LOCAL_GATEWAY_URL;
+      if (!displayNameInput.value.trim()) displayNameInput.value = DEFAULT_SETTINGS.displayName;
+    }
+
+    function createGatewayError(frameError) {
+      const error = new Error(frameError?.message || 'gateway error');
+      error.code = frameError?.code || null;
+      error.details = frameError?.details || null;
+      return error;
+    }
+
+    function requestRpc(method, params = {}, options = {}) {
+      if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
+        return Promise.reject(new Error('gateway not connected'));
+      }
+
+      const id = window.crypto.randomUUID();
+      const timeoutMs = typeof options.timeoutMs === 'number' ? Math.max(250, options.timeoutMs) : 10000;
+
+      return new Promise((resolve, reject) => {
+        debugStep('rpc:send', { method, params });
+        const timeout = window.setTimeout(() => {
+          state.pendingRequests.delete(id);
+          const error = new Error(`timeout calling ${method}`);
+          debugError('rpc:timeout', error);
+          reject(error);
+        }, timeoutMs);
+
+        state.pendingRequests.set(id, { resolve, reject, timeout });
+        state.socket.send(JSON.stringify({ type: 'req', id, method, params }));
+      });
+    }
+
+    function shouldRetryWithStoredDeviceToken(error) {
+      const details = error?.details;
+      if (!details) return false;
+      if (!state.settings.gatewayToken.trim()) return false;
+      if (!state.settings.deviceToken.trim()) return false;
+      if (!isTrustedDeviceRetryEndpoint()) return false;
+      return details.canRetryWithDeviceToken === true
+        || details.recommendedNextStep === 'retry_with_device_token'
+        || details.code === 'AUTH_TOKEN_MISMATCH';
+    }
+
+    function shouldPauseReconnect(code) {
+      return code === 'AUTH_TOKEN_MISSING'
+        || code === 'AUTH_BOOTSTRAP_TOKEN_INVALID'
+        || code === 'AUTH_PASSWORD_MISSING'
+        || code === 'AUTH_PASSWORD_MISMATCH'
+        || code === 'DEVICE_IDENTITY_REQUIRED'
+        || code === 'CONTROL_UI_DEVICE_IDENTITY_REQUIRED';
+    }
+
+    function scheduleReconnect(reason, delayOverride) {
+      clearReconnectTimer();
+      if (!state.settings.gatewayUrl) return;
+      const delay = typeof delayOverride === 'number' ? delayOverride : state.reconnectDelay;
+      debugStep('socket:reconnect-scheduled', { reason, delay });
+      setConnectionState('retrying', `${reason}. Retrying in ${Math.max(1, Math.round(delay / 1000))}s`);
+      state.reconnectTimer = window.setTimeout(() => {
+        connectToOpenClaw();
+      }, delay);
+      state.reconnectDelay = typeof delayOverride === 'number' ? Math.max(delayOverride, 2000) : Math.min(Math.round(state.reconnectDelay * 1.6), 30000);
+    }
+
+    function armConnectChallengeTimeout() {
+      clearConnectChallengeTimeout();
+      state.connectChallengeTimer = window.setTimeout(() => {
+        state.closeHandled = false;
+        if (state.socket) safeCloseSocket(state.socket, 1008, 'connect challenge timeout', 'socket:challenge-timeout-close');
+        setConnectionState('offline', 'OpenClaw did not send the connection challenge.');
+      }, 10000);
+    }
+
+    async function sendConnectRequest() {
+      if (state.connectSent) return;
+      if (!state.connectNonce) throw new Error('OpenClaw did not send a pairing nonce.');
+
+      debugStep('connect:request-start', { nonce: state.connectNonce });
+      state.connectSent = true;
+      clearConnectChallengeTimeout();
+
+      const role = 'operator';
+      const authSelection = selectConnectAuth();
+      const scopes = resolveConnectScopes(authSelection);
+      const identity = await loadOrCreateDeviceIdentity();
+      const signedAtMs = Date.now();
+      const platform = resolvePlatformLabel();
+      const payload = buildDeviceAuthPayloadV3({
+        deviceId: identity.deviceId,
+        clientId: GATEWAY_CLIENT_ID,
+        clientMode: GATEWAY_CLIENT_MODE,
+        role,
+        scopes,
+        signedAtMs,
+        token: authSelection.signatureToken || null,
+        nonce: state.connectNonce,
+        platform,
+        deviceFamily: undefined,
+      });
+      const signed = await signDevicePayload(identity, payload);
+      debugStep('connect:payload-signed', { deviceId: signed.deviceId || identity.deviceId });
+
+      const auth = {};
+      if (authSelection.authToken) auth.token = authSelection.authToken;
+      if (authSelection.authBootstrapToken) auth.bootstrapToken = authSelection.authBootstrapToken;
+      if (authSelection.authDeviceToken) auth.deviceToken = authSelection.authDeviceToken;
+
+      try {
+        const helloOk = await requestRpc('connect', {
+          minProtocol: 3,
+          maxProtocol: 3,
+          client: {
+            id: GATEWAY_CLIENT_ID,
+            displayName: state.settings.displayName || DEFAULT_SETTINGS.displayName,
+            version: '0.1.0',
+            platform,
+            mode: GATEWAY_CLIENT_MODE,
+            instanceId: CLIENT_INSTANCE_ID,
+          },
+          role,
+          scopes,
+          caps: [],
+          auth: Object.keys(auth).length > 0 ? auth : undefined,
+          device: {
+            id: signed.deviceId || identity.deviceId,
+            publicKey: signed.publicKey || identity.publicKey,
+            signature: signed.signature,
+            signedAt: signedAtMs,
+            nonce: state.connectNonce,
+          },
+        }, { timeoutMs: 12000 });
+        debugStep('connect:hello-ok', helloOk);
+        await handleHelloOk(helloOk, scopes);
+      } catch (error) {
+        debugError('connect:request-error', error);
+        handleConnectError(error);
+      }
+    }
+
+    async function handleHelloOk(helloOk, scopes) {
+      state.pendingDeviceTokenRetry = false;
+      state.reconnectDelay = 2000;
+      state.connectNonce = '';
+      state.connectSent = false;
+
+      const auth = helloOk?.auth && typeof helloOk.auth === 'object' ? helloOk.auth : {};
+      if (typeof auth.deviceToken === 'string' && auth.deviceToken.trim()) {
+        saveSettings({
+          ...state.settings,
+          deviceToken: auth.deviceToken.trim(),
+          deviceScopes: Array.isArray(auth.scopes) && auth.scopes.length > 0 ? auth.scopes : scopes,
+          bootstrapToken: '',
+          setupCode: '',
+          pairRequestId: '',
+        });
+      }
+
+      setConnectionState('live', `${state.settings.displayName || DEFAULT_SETTINGS.displayName} connected to ${state.settings.gatewayUrl}`);
+      requestRpc('sessions.subscribe').catch(() => {});
+    }
+
+    function formatConnectionError(error) {
+      const details = error?.details;
+      if (details?.code === 'AUTH_BOOTSTRAP_TOKEN_INVALID') return 'The setup code expired. Generate a new one from OpenClaw.';
+      if (details?.code === 'AUTH_TOKEN_MISSING') return 'OpenClaw requires a token or setup code for this connection.';
+      if (details?.code === 'AUTH_UNAUTHORIZED') return 'OpenClaw rejected this screen authentication.';
+      if (details?.code === 'DEVICE_AUTH_SIGNATURE_INVALID') return 'The device signature was not accepted by OpenClaw.';
+      return error?.message || 'Could not connect to the OpenClaw gateway.';
+    }
+
+    function handleConnectError(error) {
+      if (error?.message === 'gateway disconnected') return;
+      debugError('connect:error', error);
+      const details = error?.details || null;
+      const code = details?.code || error?.code || '';
+
+      if (shouldRetryWithStoredDeviceToken(error)) {
+        state.pendingDeviceTokenRetry = true;
+        state.closeHandled = true;
+        if (state.socket) safeCloseSocket(state.socket, 1008, 'retry with device token', 'socket:retry-close');
+        scheduleReconnect('Auth drift detected. Retrying with device token', 500);
+        return;
+      }
+
+      state.pendingDeviceTokenRetry = false;
+
+      if (code === 'PAIRING_REQUIRED') {
+        const requestId = typeof details?.requestId === 'string' ? details.requestId : '';
+        saveSettings({
+          ...state.settings,
+          pairRequestId: requestId,
+        });
+        state.closeHandled = true;
+        if (state.socket) safeCloseSocket(state.socket, 1008, 'pairing required', 'socket:pairing-close');
+        const pairingMessage = requestId
+          ? `Pairing pending. Approve with openclaw devices approve ${requestId}`
+          : 'Pairing pending. Approve this device with openclaw devices approve <requestId>';
+        scheduleReconnect(pairingMessage, 5000);
+        return;
+      }
+
+      setConnectionState('offline', formatConnectionError(error));
+      state.closeHandled = true;
+      if (state.socket) safeCloseSocket(state.socket, 1008, 'connect failed', 'socket:connect-failed-close');
+      if (shouldPauseReconnect(code)) {
+        openSettings(true);
+        return;
+      }
+      scheduleReconnect('Connection lost');
+    }
+
+    function extractMessageText(message) {
+      if (!message || typeof message !== 'object') return '';
+      if (typeof message.content === 'string') return message.content.trim();
+      if (Array.isArray(message.content)) {
+        const parts = message.content
+          .map((entry) => typeof entry?.text === 'string' ? entry.text.trim() : '')
+          .filter(Boolean);
+        if (parts.length > 0) return parts.join(' ');
+      }
+      if (typeof message.text === 'string') return message.text.trim();
+      return '';
+    }
+
+    function pickPreviewItem(items) {
+      if (!Array.isArray(items) || items.length === 0) return null;
+      for (let index = items.length - 1; index >= 0; index -= 1) {
+        const item = items[index];
+        if (item?.role === 'user' && typeof item.text === 'string' && item.text.trim()) return item;
+      }
+      for (let index = items.length - 1; index >= 0; index -= 1) {
+        const item = items[index];
+        if (typeof item?.text === 'string' && item.text.trim()) return item;
+      }
+      return null;
+    }
+
+    function formatCronMessage(payload) {
+      const jobName = typeof payload?.jobName === 'string' && payload.jobName.trim()
+        ? payload.jobName.trim()
+        : typeof payload?.name === 'string' && payload.name.trim()
+          ? payload.name.trim()
+          : 'cron';
+      if (typeof payload?.summary === 'string' && payload.summary.trim()) return payload.summary.trim();
+      if (payload?.action === 'started') return `Cron started: ${jobName}`;
+      if (payload?.status === 'error') return `Cron failed: ${jobName}`;
+      if (payload?.action === 'finished') return `Cron finished: ${jobName}`;
+      return `Cron activity: ${jobName}`;
+    }
+
+    function applyCronEvent(payload) {
+      setActivityState({
+        kind: 'cron',
+        source: typeof payload?.jobName === 'string' ? payload.jobName : 'cron',
+        message: formatCronMessage(payload),
+        duration_ms: payload?.action === 'started' ? 16000 : 12000,
+        last_event_ts: Date.now(),
+      });
+    }
+
+    function applyHeartbeatEvent(payload) {
+      const message = typeof payload?.message === 'string' && payload.message.trim()
+        ? payload.message.trim()
+        : typeof payload?.reason === 'string' && payload.reason.trim()
+          ? `Heartbeat: ${payload.reason.trim()}`
+          : 'Heartbeat event received';
+      setActivityState({
+        kind: 'event',
+        source: 'heartbeat',
+        message,
+        duration_ms: 8000,
+        last_event_ts: Date.now(),
+      });
+    }
+
+    async function refreshSessionPreview(payload) {
+      const sessionKey = typeof payload?.sessionKey === 'string' ? payload.sessionKey : '';
+      if (!sessionKey) return;
+
+      const previous = state.sessionActivity.get(sessionKey);
+      if (typeof payload.messageSeq === 'number' && previous && typeof previous.messageSeq === 'number' && payload.messageSeq <= previous.messageSeq) {
+        return;
+      }
+
+      try {
+        const result = await requestRpc('sessions.preview', {
+          keys: [sessionKey],
+          limit: 4,
+          maxChars: 160,
+        });
+        const preview = Array.isArray(result?.previews) ? result.previews[0] : null;
+        const item = pickPreviewItem(preview?.items);
+        if (!item) return;
+
+        const fingerprint = `${payload.messageSeq ?? 0}:${item.role}:${item.text}`;
+        if (previous?.fingerprint === fingerprint) return;
+
+        state.sessionActivity.set(sessionKey, {
+          messageSeq: typeof payload.messageSeq === 'number' ? payload.messageSeq : previous?.messageSeq,
+          fingerprint,
+        });
+
+        const label = payload.displayName || payload.label || 'message';
+        const kind = item.role === 'user' ? 'message' : 'event';
+        setActivityState({
+          kind,
+          source: label,
+          message: `${label}: ${item.text}`,
+          duration_ms: 15000,
+          last_event_ts: Date.now(),
+        });
+      } catch (error) {
+      }
+    }
+
+    function handleGatewayEvent(frame) {
+      const payload = frame.payload && typeof frame.payload === 'object' ? frame.payload : {};
+      if (frame.event === 'tick' || frame.event === 'presence' || frame.event === 'health') return;
+      if (frame.event === 'cron') {
+        applyCronEvent(payload);
+        return;
+      }
+      if (frame.event === 'heartbeat') {
+        applyHeartbeatEvent(payload);
+        return;
+      }
+      if (frame.event === 'sessions.changed' && payload.phase === 'message') {
+        refreshSessionPreview(payload);
+        return;
+      }
+      if (frame.event === 'chat' && payload.state === 'final' && payload.message) {
+        const text = extractMessageText(payload.message);
+        if (!text) return;
+        setActivityState({
+          kind: 'event',
+          source: 'agent',
+          message: text,
+          duration_ms: 10000,
+          last_event_ts: Date.now(),
+        });
+      }
+    }
+
+    function handleGatewayFrame(raw) {
+      debugStep('socket:frame', raw.slice(0, 220));
+      let frame;
+      try {
+        frame = JSON.parse(raw);
+      } catch (error) {
+        return;
+      }
+
+      if (!frame || typeof frame !== 'object') return;
+
+      if (frame.type === 'event') {
+        if (frame.event === 'connect.challenge') {
+          const nonce = typeof frame.payload?.nonce === 'string' ? frame.payload.nonce.trim() : '';
+          if (!nonce) {
+            handleConnectError(new Error('OpenClaw did not send a pairing nonce.'));
+            return;
+          }
+          state.connectNonce = nonce;
+          sendConnectRequest().catch((error) => {
+            handleConnectError(error);
+          });
+          return;
+        }
+        handleGatewayEvent(frame);
+        return;
+      }
+
+      if (frame.type === 'res' && typeof frame.id === 'string') {
+        const pending = state.pendingRequests.get(frame.id);
+        if (!pending) return;
+        state.pendingRequests.delete(frame.id);
+        window.clearTimeout(pending.timeout);
+        if (frame.ok) pending.resolve(frame.payload);
+        else pending.reject(createGatewayError(frame.error));
+      }
+    }
+
+    function connectToOpenClaw() {
+      state.legacyPolling = false;
+      debugStep('connect:start', { gatewayUrl: state.settings.gatewayUrl, location: window.location.href });
+
+      if (!state.settings.gatewayUrl) {
+        setConnectionState('setup', 'Configure OpenClaw to connect this screen');
+        openSettings(true);
+        return;
+      }
+
+      stopSocket();
+      state.closeHandled = false;
+      state.connectNonce = '';
+      state.connectSent = false;
+      setConnectionState('connecting', `Connecting to ${state.settings.gatewayUrl}`);
+
+      let socket;
+      try {
+        state.debug.lastSocketUrl = state.settings.gatewayUrl;
+        socket = new WebSocket(state.settings.gatewayUrl);
+        debugStep('socket:create', state.settings.gatewayUrl);
+      } catch (error) {
+        debugError('socket:create-failed', error);
+        setConnectionState('offline', 'The gateway URL is invalid.');
+        openSettings(true);
+        return;
+      }
+
+      state.socket = socket;
+
+      socket.onopen = () => {
+        debugStep('socket:open');
+        armConnectChallengeTimeout();
+      };
+
+      socket.onmessage = (messageEvent) => {
+        handleGatewayFrame(String(messageEvent.data));
+      };
+
+      socket.onerror = () => {
+        debugStep('socket:error', { readyState: socket.readyState, url: state.settings.gatewayUrl });
+        if (state.connectionState !== 'retrying') {
+          setConnectionState('offline', `Could not open ${state.settings.gatewayUrl}`);
+        }
+      };
+
+      socket.onclose = () => {
+        state.debug.lastClose = `readyState=${socket.readyState}`;
+        debugStep('socket:close', { readyState: socket.readyState, connectionState: state.connectionState });
+        clearConnectChallengeTimeout();
+        flushPendingRequests(new Error('gateway disconnected'));
+        state.socket = null;
+        state.connectNonce = '';
+        state.connectSent = false;
+
+        if (state.ignoreNextClose) {
+          state.ignoreNextClose = false;
+          return;
+        }
+
+        if (state.closeHandled) {
+          state.closeHandled = false;
+          return;
+        }
+
+        scheduleReconnect('Connection closed');
+      };
+    }
+
+    async function pollLegacyBridge() {
+      try {
+        const response = await fetch('/state', { cache: 'no-store' });
+        if (!response.ok) throw new Error('state fetch failed');
+        const payload = await response.json();
+        setConnectionState('live', 'Local bridge ready at http://localhost:8765');
+        if (payload.last_event_ts && payload.last_event_ts !== state.lastEventAt) {
+          setActivityState(payload);
+        }
+      } catch (error) {
+        if (state.connectionState === 'setup') {
+          setConnectionState('setup', 'Configure OpenClaw with Ctrl+,');
+        }
+      }
+    }
+
+    function startLegacyBridge() {
+      if (state.legacyPolling) return;
+      state.legacyPolling = true;
+      debugStep('legacy-bridge:start');
+      pollLegacyBridge();
+      window.setInterval(pollLegacyBridge, 1500);
+    }
+
+    function previewEvent() {
+      setActivityState({
+        kind: 'message',
+        source: 'demo',
+        message: 'OpenClaw connected. Cron jobs, messages, and events arrive over the real gateway.',
+        duration_ms: 12000,
+      });
+    }
+
+    window.addEventListener('error', (event) => {
+      debugError('window-error', event.error || event.message || 'Unknown window error');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      debugError('unhandled-rejection', event.reason || 'Unknown rejection');
+    });
+
+    copyDebugButton.addEventListener('click', async () => {
+      const payload = `${debugSummary.textContent}\n\n${debugLog.textContent}`;
+      try {
+        await navigator.clipboard.writeText(payload);
+        debugStep('diagnostics:copied');
+      } catch (error) {
+        debugError('diagnostics:copy-failed', error);
+      }
+    });
+
+    clearDebugButton.addEventListener('click', () => {
+      state.debug.entries = [];
+      state.debug.lastError = '';
+      debugStep('diagnostics:cleared');
+    });
+
+    settingsForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      try {
+        const formData = Object.fromEntries(new FormData(settingsForm).entries());
+        const settings = normalizeSettings(formData);
+        saveSettings(settings);
+        closeSettings();
+        connectToOpenClaw();
+      } catch (error) {
+        setupError.textContent = error instanceof Error ? error.message : 'Could not save the configuration.';
+      }
+    });
+
+    retryButton.addEventListener('click', () => {
+      setupError.textContent = '';
+      connectToOpenClaw();
+    });
+
+    localButton.addEventListener('click', () => {
+      fillLocalOpenClawSettings();
+      const formData = {
+        setupCode: setupCodeInput.value,
+        gatewayUrl: gatewayUrlInput.value,
+        gatewayToken: gatewayTokenInput.value,
+        displayName: displayNameInput.value,
+      };
+
+      if (!String(formData.gatewayToken || '').trim() && !state.settings.gatewayToken.trim()) {
+        setupError.textContent = 'Local OpenClaw selected. Paste your gateway token, then click Save and connect.';
+        gatewayTokenInput.focus();
+        return;
+      }
+
+      try {
+        const settings = normalizeSettings(formData);
+        saveSettings(settings);
+        closeSettings();
+        connectToOpenClaw();
+      } catch (error) {
+        setupError.textContent = error instanceof Error ? error.message : 'Could not apply the local OpenClaw settings.';
+      }
+    });
+
+    demoButton.addEventListener('click', previewEvent);
+
+    resetDeviceButton.addEventListener('click', async () => {
+      stopSocket();
+      try {
+        await invokeNative('reset_device_identity', {});
+        debugStep('device:identity-reset', 'Device identity deleted. A new keypair will be generated on next connect.');
+      } catch (error) {
+        debugError('device:identity-reset-error', error);
+      }
+      window.localStorage.removeItem(DEVICE_IDENTITY_KEY);
+      clearSettings();
+      setConnectionState('setup', 'Device identity reset. Reconnect to create a new pairing.');
+      setupError.textContent = 'Device identity reset. Enter your gateway URL/token and connect again.';
+    });
+
+    clearButton.addEventListener('click', () => {
+      stopSocket();
+      clearSettings();
+      setConnectionState('setup', 'Settings cleared. Connect OpenClaw to continue.');
+      openSettings(!state.legacyPolling);
+    });
+
+    closeButton.addEventListener('click', () => {
+      closeSettings();
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === ',') {
+        event.preventDefault();
+        openSettings(false);
+      }
+
+      if (event.key === 'Escape' && state.settingsOpen && !closeButton.hidden) {
+        closeSettings();
+      }
+    });
+
+    function updateClock() {
+      const now = new Date();
+      timeText.textContent = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      dateText.textContent = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+    window.setInterval(updateClock, 1000);
+    updateClock();
+
+    function drawOrbitalField(time) {
+      ctx.clearRect(0, 0, w, h);
+      const busy = state.mode === 'busy';
+      const rings = busy ? 7 : 4;
+      const base = Math.min(w, h) * (busy ? 0.1 : 0.12);
+
+      for (let index = 0; index < rings; index += 1) {
+        const radius = base + index * (busy ? 36 : 52) + Math.sin(time * 0.001 + index) * (busy ? 14 : 8);
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = busy
+          ? `rgba(255, 209, 102, ${0.08 + index * 0.02})`
+          : `rgba(102, 227, 255, ${0.05 + index * 0.02})`;
+        ctx.lineWidth = busy ? 2.5 : 1.2;
+        ctx.stroke();
+      }
+
+      const coreRadius = base * (busy ? 0.78 : 0.92) + Math.sin(time * 0.002) * (busy ? 18 : 10);
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius * 2.2);
+      if (busy) {
+        gradient.addColorStop(0, 'rgba(255, 209, 102, 0.95)');
+        gradient.addColorStop(0.4, 'rgba(255, 174, 66, 0.22)');
+        gradient.addColorStop(1, 'rgba(255, 174, 66, 0)');
+      } else {
+        gradient.addColorStop(0, 'rgba(102, 227, 255, 0.75)');
+        gradient.addColorStop(0.45, 'rgba(102, 227, 255, 0.18)');
+        gradient.addColorStop(1, 'rgba(102, 227, 255, 0)');
+      }
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreRadius * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (const particle of state.particles) {
+        const angle = particle.angle + time * particle.speed * (busy ? 3.5 : 1.2) + Math.sin((time + particle.drift) * 0.001) * 0.08;
+        const wave = Math.sin((time + particle.drift) * 0.002) * (busy ? 32 : 12);
+        const x = cx + Math.cos(angle) * (particle.radius + wave);
+        const y = cy + Math.sin(angle) * (particle.radius + wave);
+        ctx.beginPath();
+        ctx.arc(x, y, busy ? particle.size * 1.3 : particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = busy ? 'rgba(255, 220, 140, 0.85)' : 'rgba(180, 240, 255, 0.62)';
+        ctx.fill();
+      }
+
+      if (busy) {
+        for (let index = 0; index < 5; index += 1) {
+          const sweep = (time * 0.004 + index * 0.9) % (Math.PI * 2);
+          ctx.beginPath();
+          ctx.arc(cx, cy, base + 90 + index * 24, sweep, sweep + 0.7);
+          ctx.strokeStyle = `rgba(255, 209, 102, ${0.25 - index * 0.03})`;
+          ctx.lineWidth = 4 - index * 0.4;
+          ctx.stroke();
+        }
+      }
+    }
+
+    function loop(time) {
+      normalizeIdle();
+      drawOrbitalField(time);
+      window.requestAnimationFrame(loop);
+    }
+
+    function boot() {
+      debugStep('boot:start', {
+        href: window.location.href,
+        protocol: window.location.protocol,
+        hostname: window.location.hostname,
+      });
+      hydrateSettingsForm();
+      if (state.settings.gatewayUrl) {
+        debugStep('boot:auto-connect', state.settings.gatewayUrl);
+        connectToOpenClaw();
+      } else if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        debugStep('boot:http-mode');
+        startLegacyBridge();
+      } else {
+        debugStep('boot:settings-required');
+        setConnectionState('setup', 'Configure OpenClaw to connect this screen');
+        openSettings(true);
+      }
+
+      updateDebugPanel();
+      window.requestAnimationFrame(loop);
+    }
+
+    boot();
+  </script>
+</body>
+</html>

@@ -5,6 +5,7 @@ import json
 import time
 
 ROOT = Path(__file__).resolve().parent
+WEB_ROOT = ROOT / "web"
 STATE = {
     "kind": "idle",
     "source": "system",
@@ -16,7 +17,7 @@ STATE = {
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(ROOT), **kwargs)
+        super().__init__(*args, directory=str(WEB_ROOT), **kwargs)
 
     def _send_json(self, payload, code=200):
         data = json.dumps(payload).encode("utf-8")
