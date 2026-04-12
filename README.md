@@ -199,9 +199,43 @@ curl -X POST http://localhost:8765/event \
   }'
 ```
 
+## Installing the Linux build (Ubuntu, after `npm run build`)
+
+Artifacts are under `src-tauri/target/release/bundle/`:
+
+### Debian package (recommended on Ubuntu)
+
+```bash
+cd ~/openclaw-screensaver   # or your clone path
+sudo apt install ./src-tauri/target/release/bundle/deb/*.deb
+```
+
+That pulls in declared dependencies. The binary is usually on `PATH` as:
+
+```bash
+openclaw-activity-screen
+```
+
+Confirm with:
+
+```bash
+dpkg -L openclaw-activity-screen | grep /bin/
+```
+
+Use that path in the autostart `Exec=` line below (often `/usr/bin/openclaw-activity-screen`).
+
+### AppImage
+
+```bash
+chmod +x src-tauri/target/release/bundle/appimage/*.AppImage
+./src-tauri/target/release/bundle/appimage/*.AppImage
+```
+
+For autostart, set `Exec=` to the **full path** to the AppImage.
+
 ## Ubuntu kiosk (OS-level)
 
-For a public Ubuntu display, treat the **session** as the security boundary: dedicated user, auto-login, autostart the app, and reduce escape hatches (lock screen, suspend, stray shortcuts). The Tauri window is already fullscreen without decorations; the OS should keep users in that session.
+For a public Ubuntu 24 (GNOME) display, treat the **session** as the security boundary: dedicated user, auto-login, autostart the app, and reduce escape hatches (lock screen, suspend, stray shortcuts). The Tauri window is already fullscreen without decorations; the OS should keep users in that session.
 
 ### 1. Dedicated user
 
@@ -211,24 +245,24 @@ Create a non-administrative user used only for the display (example name: `displ
 sudo adduser display
 ```
 
-Install your OpenClaw Activity Screen package or place the AppImage/binary where that user can execute it (e.g. `/opt/openclaw-activity-screen/` with appropriate permissions).
+Install the `.deb` while logged in as an admin user (see above), then the `display` user can run `openclaw-activity-screen` from the menu or autostart.
 
 ### 2. Autostart the app (GNOME)
 
-Log in once as `display`, then create an autostart entry (adjust `Exec` to your real path or AppImage):
+Log in once as `display`, then create an autostart entry. Use the real `Exec` path (installed `.deb` vs AppImage):
 
 ```bash
 mkdir -p ~/.config/autostart
 nano ~/.config/autostart/openclaw-activity-screen.desktop
 ```
 
-Example `openclaw-activity-screen.desktop`:
+Example when installed from the `.deb` (adjust if `dpkg -L` shows a different path):
 
 ```ini
 [Desktop Entry]
 Type=Application
 Name=OpenClaw Activity Screen
-Exec=/opt/openclaw-activity-screen/openclaw-activity-screen
+Exec=/usr/bin/openclaw-activity-screen
 X-GNOME-Autostart-enabled=true
 ```
 
