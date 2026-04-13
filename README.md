@@ -1,44 +1,47 @@
 # OpenClaw Activity Screen
 
-Public activity display for OpenClaw.
+A real-time public activity display for OpenClaw, designed to showcase live events, messages, and system activity from your OpenClaw instance. This app connects directly to the OpenClaw gateway and visually presents activity updates on a dedicated screen—ideal for lobbies, offices, or any public display needing live operational visibility. No custom backend setup is required—just connect to your OpenClaw gateway, authenticate, and go!
 
-This project is moving from a local Python + browser demo into a packaged desktop app built with Tauri so users can install it, pair it with OpenClaw, and leave it running full-screen in a public space.
+## Quick start
 
-## Recommended setup: local OpenClaw (same machine)
+### Recommended: OpenClaw on the same machine
 
-**The recommended approach is to run OpenClaw and this screen app on the same computer.** You use the loopback WebSocket URL, a single gateway token, and avoid exposing the gateway over the network for a simple lobby or office display.
+For a lobby or office display, run OpenClaw and this app on **one computer**. You connect over loopback (`ws://127.0.0.1:18789`), use the gateway token from that install, and you do not need to expose the gateway on the network.
 
-1. **Start OpenClaw** on that machine so the gateway WebSocket is listening (default URL: `ws://127.0.0.1:18789/`). Use whatever command or service your OpenClaw install documents for running the gateway locally.
+1. **Start OpenClaw** so the gateway WebSocket is listening (default: `ws://127.0.0.1:18789/`). Use the command or service your OpenClaw docs describe for running the gateway locally.
 
-2. **Read the gateway token** in a terminal (on the same machine):
+2. **Copy the gateway token** (same machine, in a terminal):
 
    ```bash
    openclaw config get gateway.auth.token
    ```
 
-   Copy **only** the token string that command prints. Paste it into the activity screen’s **Gateway token** field in settings. Do not paste shell commands (such as `rm …` or `openclaw config …`) into that field — the app sends that value to the gateway as the shared auth token.
+   Paste **only** the printed token into the app’s **Gateway token** field. That value is sent to the gateway as auth; do not paste shell commands into the field.
 
-3. **Run the activity screen** (development or installed package):
+3. **Start this app** — from source:
 
    ```bash
    npm install
    npm run dev
    ```
 
-   Or install a built `.deb` / AppImage / platform bundle and launch **OpenClaw Activity Screen**.
+   Or install a built `.deb`, AppImage, macOS `.app` bundle, or other platform bundle, then open **OpenClaw Activity Screen**.
 
-4. Open settings with **Ctrl+,**. Optionally set **Screen title** (large heading), **Display name** (pairing / presence), then click **Use local OpenClaw** (pre-fills `ws://127.0.0.1:18789`) or enter that URL manually. Paste the gateway token and choose **Save and connect**.
+4. Press **Ctrl+,** for settings. Optionally set **Screen title** and **Display name** (pairing / presence). Click **Use local OpenClaw** (fills `ws://127.0.0.1:18789`) or type that URL, paste the token, then **Save and connect**.
 
-5. **Approve pairing once** (first connection only):
+After a successful pair, the app stores a device token and reconnects on its own.
 
-   ```bash
-   openclaw devices list
-   openclaw devices approve <requestId>
-   ```
+**Shortcuts:** **Ctrl+,** — settings; **Ctrl+.** — diagnostics panel.
 
-After the first success, the screen stores a paired device token and reconnects automatically.
+### Advanced: remote or LAN gateway
 
-Shortcuts: **Ctrl+,** opens settings; **Ctrl+.** toggles the diagnostics panel.
+Use this when the gateway runs on **another host** or you reach it over the LAN. In settings, set **Gateway URL** to that host’s `ws://…` or `wss://…`. Prefer **`wss://`** on untrusted networks. If your deployment uses it, a **setup code** can carry URL and bootstrap token instead of typing everything by hand. Auth and pairing work the same way as locally: use the token or bootstrap flow your server documents; the first connect may still need `openclaw devices list` and `openclaw devices approve <requestId>` on the gateway side.
+
+```bash
+openclaw qr --setup-code-only
+openclaw devices list
+openclaw devices approve <requestId>
+```
 
 ## Product direction
 
@@ -75,13 +78,7 @@ Settings include:
 
 ### Remote or LAN setup (optional)
 
-If the gateway is not on localhost, use a setup code or enter `wss://…` / `ws://…` and the token or bootstrap flow your deployment uses. Prefer **`wss://`** on untrusted networks.
-
-```bash
-openclaw qr --setup-code-only
-openclaw devices list
-openclaw devices approve <requestId>
-```
+Same flow as [Advanced: remote or LAN gateway](#advanced-remote-or-lan-gateway) at the top of this file—use the gateway’s URL, token or setup code, and approve pairing from the gateway host when prompted.
 
 ### Local Python bridge
 
