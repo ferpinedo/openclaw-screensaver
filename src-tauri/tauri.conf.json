@@ -16,11 +16,13 @@
         "label": "main",
         "title": "OpenClaw Activity Screen",
         "useHttpsScheme": false,
-        "fullscreen": true,
+        "fullscreen": false,
         "resizable": false,
         "decorations": false,
-        "visible": true,
-        "focus": true
+        "visible": false,
+        "focus": true,
+        "width": 1920,
+        "height": 1080
       }
     ]
   },

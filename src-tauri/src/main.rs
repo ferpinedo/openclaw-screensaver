@@ -193,6 +193,25 @@ fn main() {
             sign_device_payload,
             reset_device_identity
         ])
+        .setup(|app| {
+            let window = app.get_webview_window("main")
+                .expect("failed to get main window");
+
+            if let Some(monitor) = window.current_monitor().ok().flatten()
+                .or_else(|| window.primary_monitor().ok().flatten())
+                .or_else(|| window.available_monitors().ok()
+                    .and_then(|monitors| monitors.into_iter().next()))
+            {
+                let size = monitor.size();
+                let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
+                let _ = window.set_position(tauri::PhysicalPosition::new(0, 0));
+            }
+
+            let _ = window.set_fullscreen(true);
+            let _ = window.show();
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running OpenClaw activity screen");
 }
