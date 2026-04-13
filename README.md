@@ -43,6 +43,14 @@ openclaw devices list
 openclaw devices approve <requestId>
 ```
 
+## Next steps
+
+Ideas and planned work:
+
+- **New animation styles** — Broader visual language and motion for different kinds of activity, not only the current treatments.
+- **Agent I/O visibility** — Settings to optionally show what the agent **received** (incoming context or payloads) and to show the **response**, for demos or trusted displays where transparency matters.
+- **Kiosk-style operation** — The app does not ship a dedicated kiosk toggle; treat full-screen public displays as an **OS responsibility**. Use the pointers under [Product direction](#product-direction) (Linux, Windows, macOS), and for Linux follow [Ubuntu kiosk (OS-level)](#ubuntu-kiosk-os-level).
+
 ## Product direction
 
 The intended end-user flow is:
