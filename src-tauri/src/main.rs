@@ -7,6 +7,7 @@ use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+use tauri::path::BaseDirectory;
 use tauri::Manager;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,6 +37,13 @@ struct SignedPayload {
     signature: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChefVideoAssets {
+    idle_path: String,
+    busy_path: String,
+}
+
 fn now_ms() -> Result<u64, String> {
     Ok(SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -56,6 +64,23 @@ fn identity_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_data_dir()
         .map_err(|err| format!("failed to resolve app data dir: {err}"))?;
     Ok(dir.join("identity").join("device.json"))
+}
+
+fn resolve_video_asset_path(app: &tauri::AppHandle, relative_path: &str) -> Result<PathBuf, String> {
+    let resource_path = app
+        .path()
+        .resolve(relative_path, BaseDirectory::Resource)
+        .map_err(|err| format!("failed to resolve resource path for {relative_path}: {err}"))?;
+    if resource_path.exists() {
+        return Ok(resource_path);
+    }
+
+    let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative_path);
+    if dev_path.exists() {
+        return Ok(dev_path);
+    }
+
+    Err(format!("video asset not found: {relative_path}"))
 }
 
 fn as_public(identity: &StoredDeviceIdentity) -> DeviceIdentityPublic {
@@ -186,12 +211,26 @@ fn reset_device_identity(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn resolve_chef_video_assets(app: tauri::AppHandle) -> Result<ChefVideoAssets, String> {
+    let idle_path = resolve_video_asset_path(&app, "videos/sharpening-web.mp4")
+        .map_err(|err| format!("failed to resolve idle chef video: {err}"))?;
+    let busy_path = resolve_video_asset_path(&app, "videos/cooking-web.mp4")
+        .map_err(|err| format!("failed to resolve busy chef video: {err}"))?;
+
+    Ok(ChefVideoAssets {
+        idle_path: idle_path.to_string_lossy().into_owned(),
+        busy_path: busy_path.to_string_lossy().into_owned(),
+    })
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             load_or_create_device_identity,
             sign_device_payload,
-            reset_device_identity
+            reset_device_identity,
+            resolve_chef_video_assets
         ])
         .setup(|app| {
             let window = app.get_webview_window("main")
